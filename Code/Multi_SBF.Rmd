@@ -40,21 +40,38 @@ r <- 1:n_sim_par    # list for index
 
 ```{r}
 set.seed(123)
-jobs <- expand.grid(d_par, rho_par, model_par, n_par, n_sim_par, n_cores, r)
-jobs <- lapply(1:nrow(jobs), function(x){list(jobs=jobs[x,],seeds=round(runif(n_sim_par,0,999999999)))})
+jobs <- expand.grid(d_par, rho_par, model_par, n_par, n_sim_par, n_cores, r) ## dataframe for running
+jobs <- lapply(1:nrow(jobs), function(x){list(jobs=jobs[x,],seeds=round(runif(n_sim_par,0,999999999)))}) ## assign different seeds
 ```
 
 
-## main function
+## Main function
+
+### smooth.alpha funcion
+
+Because we need 
 
 
 ```{r}
+
 myparallelfunction <- function(x){
-  smooth.alpha <- function(x){
+  
+  smooth.alpha <- function(alpha, K_X_b,k_X_b, K_b,k_b, b, n_grid, d,n,nb, get_baseline ){
+    alpha_smooth_i <- array(dim = c(d,n))
+    alpha_smooth_i_0 <- array(dim = c(n,n_grid[1]))
+    for ( k in 1:d ) {
+      if (k==1){
+        for (i in 1:n) {
+          alpha_smooth_i[k,i] <- 1
+          alpha_smooth_i_0[i,] <- (K_b/k_b)%*%alpha[[k]]}}  # no weight dx because they are the same and constant, can be cancelled (TODO)
+    }else for (i in 1:n) {
+      alpha_smooth_i[k,i] <- (K_X_b[[k]][i,]/k_X_b[[k]][i])%*%alpha[[k]] 
+    }
     
+    if (get_baseline==FALSE) return(alpha_smooth_i) else return(list(alpha_smooth_i = alpha_smooth_i, alpha_smooth_i_0 = alpha_smooth_i_0))
   }
   
-  
+  get.denominator <- function(){}
   
   
   
