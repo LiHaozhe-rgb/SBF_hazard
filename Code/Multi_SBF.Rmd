@@ -201,6 +201,128 @@ For each sample point \(i = 1, \dots, n\):
 
 ### get.denominator funcion
 
+#### 1. Purpose of `get.denominator()`
+
+The function `get.denominator()` implements **one backfitting update** for a **single multiplicative component** in a proportional hazards–type model with multiplicative structure.
+
+We consider a hazard (or intensity) of the form
+
+\[
+\alpha(t, z) \;=\; \alpha_0(t)\,\prod_{k=1}^{p}\alpha_k(z_k),
+\]
+
+where:
+
+- \(\alpha_0(t)\) is the **baseline hazard** (time-dependent),
+- \(\alpha_k(z_k)\) for \(k\ge 1\) are **covariate effect functions** (each depends on one covariate only),
+- \(p=d-1\) if the code uses `d` to include time as the first “dimension”.
+
+The main output is the updated **grid-based estimate** of the selected component \(\alpha_{kk}\) (baseline if `kk=1`, otherwise a covariate component).
+
+> Important note: despite its name, this function returns **the updated component** \(\hat\alpha_{kk}\), not merely a denominator.
+
+---
+
+#### 2. High-level formula: the backfitting update
+
+At each update step for component \(kk\), the algorithm constructs:
+
+- a **numerator** \(O_{kk}(\cdot)\) (occurrence / event contribution),
+- a **denominator** \(D_{kk}(\cdot)\) (exposure / risk-set contribution),
+
+and returns
+
+\[
+\boxed{
+\hat\alpha_{kk}(\cdot) \;=\; \frac{O_{kk}(\cdot)}{D_{kk}(\cdot)}.
+}
+\]
+
+This is a multiplicative analogue of “events / exposure”, smoothed onto the relevant grid.
+
+---
+
+#### 3. Inputs: symbols, meaning, and dimensions
+
+Below is a practical mapping of the function arguments to mathematical objects and **their typical dimensions**.
+
+##### 3.1 Data and component estimates
+
+- `data`: a data frame with at least:
+  - `data$time`: observed time \(T_i\),
+  - `data$status`: event indicator \(\delta_i \in \{0,1\}\).
+
+- `alpha`: a **list** of current component estimates on grids.
+  - `alpha[[1]]`: baseline component on the **time grid**,
+  - `alpha[[k]]` for \(k\ge 2\): covariate component on the **k-th covariate grid**.
+
+**Dimensions**
+- Let \(m_1 = n.grid[1]\) (length of the time grid).
+- Let \(m_k = n.grid[k]\) (length of grid for dimension \(k\)).
+Then:
+- `alpha[[1]]` is a numeric vector of length \(m_1\),
+- `alpha[[k]]` is a numeric vector of length \(m_k\).
+
+##### 3.2 Grids
+
+- `x.grid`: a list of grid vectors:
+  - `x.grid[[1]] = (t_1,\dots,t_{m_1})` time grid,
+  - `x.grid[[k]]` for \(k\ge 2\) covariate grid points.
+
+- `n.grid`: integer vector:
+  \[
+  n.grid[k] = \text{length}(x.grid[[k]]).
+  \]
+
+##### 3.3 Kernel weights
+
+These objects encode kernel smoothing:
+
+- `K.X.b[[k]]`: kernel weights from sample points to the grid of dimension \(k\) (covariate or time if reused).
+  - `K.X.b[[k]][i, ]` is a weight vector across the grid of dimension \(k\) for observation \(i\).
+
+- `k.X.b[[k]]`: normalization constants (row sums of `K.X.b[[k]]`):
+  \[
+  k.X.b[[k]][i] = \sum_{\ell=1}^{m_k} K.X.b[[k]][i,\ell].
+  \]
+
+**Dimensions**
+- For each \(k\):
+  - `K.X.b[[k]]` is an \(n \times m_k\) matrix,
+  - `k.X.b[[k]]` is a length-\(n\) vector.
+
+Baseline/time smoothing uses separate objects:
+
+- `K.b`: time-grid–to–time-grid kernel matrix.
+- `k.b`: normalization vector, typically row sums of `K.b`.
+
+**Dimensions**
+- `K.b` is \(m_1 \times m_1\),
+- `k.b` is length \(m_1\).
+
+##### 3.4 Risk indicator on the time grid
+
+- `Y`: risk indicator matrix
+  \[
+  Y[i,\ell] = \mathbf{1}\{t_\ell \le T_i\}.
+  \]
+
+**Dimensions**
+- `Y` is an \(n \times m_1\) matrix.
+
+##### 3.5 Control/indexing parameters
+
+- `kk`: the index of the component to update.
+  - `kk == 1` means updating the baseline \(\alpha_0(t)\),
+  - `kk >= 2` means updating the \((kk-1)\)-th covariate component.
+
+- `get.baseline`: logical:
+  - `TRUE`: baseline is estimated as a function of time,
+  - `FALSE`: baseline is treated as fixed/constant (or excluded from estimation in this routine).
+
+Other arguments such as `bb`, `d`, `n`, `nb` provide bandwidth index and dimension bookkeeping.
+
+---
 
 
 
@@ -236,7 +358,7 @@ myparallelfunction <- function(x){
       alpha_minusk_smooth <- array(dim=c(n,n_grid[1]))
       for (i in 1:n) {
         if (kk==1){alpha_minusk_smooth[i,] <- rep(prod(alpha_smooth_i$alpha_smooth_i[-1,i], n_grid[1]))}
-      }else {alpha_minusk_smooth[i,] <- prod(alpha_smooth_i$alpha_smooth_i[-kk,i]*alpha_smooth_i$alpha_smooth_i_0)}
+        else {alpha_minusk_smooth[i,] <- prod(alpha_smooth_i$alpha_smooth_i[-kk,i]*alpha_smooth_i$alpha_smooth_i_0)} }
     }
     if (get_baseline == TRUE){
       for (i in 1:n) {
