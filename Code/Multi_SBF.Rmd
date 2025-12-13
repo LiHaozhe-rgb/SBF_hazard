@@ -50,7 +50,7 @@ jobs <- lapply(1:nrow(jobs), function(x){list(jobs=jobs[x,],seeds=round(runif(n_
 
 ```{r}
 myparallelfunction <- function(x){
-  smooth.alpha <- function(x){
+  smooth.alpha <- function(a, K_x_b, k_x_b, k_x, k_b ){
     
   }
   
