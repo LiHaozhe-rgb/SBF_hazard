@@ -64,8 +64,19 @@ myparallelfunction<-function(x){
     } } 
     if (get.baseline==TRUE){  ## if alpha_0 not constant
       if (kk==1){
-        D<- rowSums(sapply(1:n, function(i){ return((c((x.grid[[1]][-1]-x.grid[[1]][-n.grid[1]]), x.grid[[1]][n.grid[1]]-x.grid[[1]][(n.grid[1]-1)])*(alpha.minusk.smooth[i,]*Y[i,]))%*%(K.b/k.b))}))  # equivalent, the first part is computing the integration weight dx
-        }else D<- rowSums(sapply(1:n, function(i){ return(as.numeric(c((x.grid[[1]][-1]-x.grid[[1]][-n.grid[1]]), x.grid[[1]][n.grid[1]]-x.grid[[1]][(n.grid[1]-1)])%*%(Y[i,]*(alpha.minusk.smooth[i,])))*(K.X.b[[kk]][i,]/k.X.b[[kk]][i]))}))                                              # equivalent to SBF_MH_LC
+        D<- rowSums(sapply(1:n, function(i){ return((
+          c((x.grid[[1]][-1]-x.grid[[1]][-n.grid[1]]), x.grid[[1]][n.grid[1]]-x.grid[[1]][(n.grid[1]-1)])
+          *(alpha.minusk.smooth[i,]*Y[i,]))
+          %*%(K.b/k.b)
+          )
+          }))  # equivalent, the first part is computing the integration weight dx
+        }else D<- rowSums(sapply(1:n, function(i){ return(
+          as.numeric(
+            c((x.grid[[1]][-1]-x.grid[[1]][-n.grid[1]]), x.grid[[1]][n.grid[1]]-x.grid[[1]][(n.grid[1]-1)])
+            %*%(Y[i,]
+            *(alpha.minusk.smooth[i,])))
+            *(K.X.b[[kk]][i,]/k.X.b[[kk]][i])
+          )}))                                              # equivalent to SBF_MH_LC
      }else {
       if (kk==1){
         D<- rowSums(sapply(1:n, function(i){ return((c((x.grid[[1]][-1]-x.grid[[1]][-n.grid[1]]), x.grid[[1]][n.grid[1]]-x.grid[[1]][(n.grid[1]-1)])*(alpha.minusk.smooth[i]*Y[i,]))%*%(K.b/k.b))}))   # the same as when get.baseline==TRUE and kk=1
