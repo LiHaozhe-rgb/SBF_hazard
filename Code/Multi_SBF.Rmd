@@ -80,19 +80,28 @@ and interacts with the risk indicator \(Y_i(t)\).
 ---
 Function Arguments and Their Meaning
 
-smooth.alpha <- function(
-  alpha,        # list of grid-based estimates alpha[[k]]
+  alpha,        # list of grid-based estimates alpha[[k]], the vector of length n.gird[k]
+
   K.X.b,        # list of kernel weight matrices (sample -> grid)
+
   k.X.b,        # list of kernel weight sums (normalization)
+
   K.b,          # kernel smoothing matrix for time grid (baseline)
+
   k.b,          # normalization vector for baseline smoothing
+
   b,            # bandwidth (not explicitly used here)
+
   n.grid,       # number of grid points per dimension
+
   d,            # total dimension (time + covariates)
+
   n,            # sample size
+
   nb,           # number of bandwidths (technical)
+
   get.baseline  # logical: whether baseline hazard is estimated
-)
+
 
 
 ```{r}
@@ -105,16 +114,16 @@ myparallelfunction <- function(x){
       if (k==1){
         for (i in 1:n) {
           alpha_smooth_i[k,i] <- 1
-          alpha_smooth_i_0[i,] <- (K_b/k_b)%*%alpha[[k]]}}  # no weight dx because they are the same and constant, can be cancelled (TODO)
-    }else for (i in 1:n) {
+          alpha_smooth_i_0[i,] <- (K_b/k_b)%*%alpha[[k]]}  # no weight dx because they are the same and constant, can be cancelled (TODO)
+      } else for (i in 1:n) {
       alpha_smooth_i[k,i] <- (K_X_b[[k]][i,]/k_X_b[[k]][i])%*%alpha[[k]] 
-    }
+      }
     
     if (get_baseline==FALSE) return(alpha_smooth_i) else return(list(alpha_smooth_i = alpha_smooth_i, alpha_smooth_i_0 = alpha_smooth_i_0))
-  }
+    }
   
   get.denominator <- function(){}
-
+  }
 }
 ```
 
