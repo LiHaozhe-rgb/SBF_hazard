@@ -47,12 +47,12 @@ jobs <- lapply(1:nrow(jobs), function(x){list(jobs=jobs[x,],seeds=round(runif(n_
 
 ## Main function
 
-### smooth.alpha funcion
-
 The multiplicative hazard model is
 \[
 \alpha(t, z) = \alpha_0(t) \prod_{k=1}^{d-1} \alpha_k(z_k).
 \]
+
+### smooth.alpha funcion
 
 Each component \(\alpha_k\) is estimated on a grid:
 \[
@@ -77,7 +77,7 @@ K\!\left(\frac{X_{ik}-x_{k\ell}}{b}\right)
 The baseline hazard \(\alpha_0(t)\) is treated separately because it is integrated over time
 and interacts with the risk indicator \(Y_i(t)\).
 
----
+
 Function Arguments and Their Meaning
 
   alpha,        # list of grid-based estimates alpha[[k]], the vector of length n.gird[k]
@@ -101,6 +101,108 @@ Function Arguments and Their Meaning
   nb,           # number of bandwidths (technical)
 
   get.baseline  # logical: whether baseline hazard is estimated
+
+
+
+#### Role in Smooth Backfitting
+
+`smooth.alpha()` does **not** update model parameters.  
+It only provides the sample-level evaluations needed to form
+\[
+\prod_{j \neq k} \hat\alpha_j(X_{ij})
+\]
+in the smooth backfitting update equations.
+
+#### Inputs
+
+- Grid-based component estimates:
+  \[
+  \hat\alpha_k(x_{k\ell}), \quad \ell = 1,\dots,m_k,\; k=0,\dots,d-1
+  \]
+- Sample observations:
+  \[
+  X_{ik}, \quad i=1,\dots,n
+  \]
+- Kernel weights between samples and grids
+- Logical flag `get.baseline` indicating whether the baseline hazard is estimated
+
+---
+
+#### Step-by-Step Procedure
+
+##### Step 1: Initialize storage
+
+- Create an array to store smoothed component values at sample points:
+  \[
+  \alpha^{\text{smooth}}_{k,i} \approx \hat\alpha_k(X_{ik})
+  \]
+- If the baseline hazard is estimated, allocate additional storage
+  for time-grid smoothing.
+
+---
+
+##### Step 2: Loop over model components \(k = 0, \dots, d-1\)
+
+###### Case A: Baseline component (\(k = 0\))
+
+1. Set
+   \[
+   \alpha^{\text{smooth}}_{0,i} = 1
+   \quad \text{for all } i
+   \]
+   since the baseline does not enter pointwise multiplicative products.
+2. Smooth the baseline hazard on the **time grid** using a kernel smoother:
+   \[
+   \hat\alpha_0^{\text{smooth}}(t_\ell)
+   =
+   \sum_r W_{\ell r} \hat\alpha_0(t_r),
+   \]
+   where the kernel weights are normalized row-wise.
+
+---
+
+###### Case B: Covariate components (\(k \ge 1\))
+
+For each sample point \(i = 1, \dots, n\):
+
+1. Compute kernel weights between the sample value \(X_{ik}\) and grid points
+   \(\{x_{k\ell}\}\).
+2. Normalize the weights so they sum to one.
+3. Evaluate the component at the sample point via a weighted average:
+   \[
+   \hat\alpha_k(X_{ik})
+   =
+   \sum_{\ell=1}^{m_k}
+   w_{ik\ell} \hat\alpha_k(x_{k\ell}).
+   \]
+
+---
+
+#### Step 3: Return results
+
+- If `get.baseline = FALSE`, return only
+  \[
+  \{\hat\alpha_k(X_{ik})\}_{k,i}.
+  \]
+- If `get.baseline = TRUE`, also return the smoothed baseline hazard
+  on the time grid.
+
+---
+
+#### Output
+
+- Smoothed component values at sample points:
+  \[
+  \alpha^{\text{smooth}}_{k,i}
+  \]
+- (Optional) Smoothed baseline hazard on the time grid
+
+---
+
+### get.denominator funcion
+
+
+
 
 
 
