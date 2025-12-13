@@ -8,22 +8,59 @@ date: "2025-12-12"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+# R_code_description
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+This file should produce the same plots as the paper
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Load packages
 
-```{r cars}
-summary(cars)
+```{r}
+graphics.off()
+library(parallel) 
+library("MASS") 
 ```
 
-## Including Plots
+## Parameters set
 
-You can also embed plots, for example:
+This set of parameters corresponds to the most challenging simulation setup in Section 5 of the paper: Model 2, sample size 200, highly correlated covariates(0.8), and the differences in numerical stability and ISE between smooth backfitting and the Lin–He–Huang (2016) method are compared through 200 Monte Carlo repetitions.
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+d_par <- c(3)       # the dimension of data, including time (time + z1 + z2)
+rho_par <- c(0.8)   # the correlation between Z tilde
+n_par <- c(200)     # the number of observations of data
+model_par <- c(2)   # model2
+n_sim_par <- c(200) # number of simulation
+n_cores <- c(7)
+r <- 1:n_sim_par    # list for index
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+## Seeds set
+
+```{r}
+set.seed(123)
+jobs <- expand.grid(d_par, rho_par, model_par, n_par, n_sim_par, n_cores, r)
+jobs <- lapply(1:nrow(jobs), function(x){list(jobs=jobs[x,],seeds=round(runif(n_sim_par,0,999999999)))})
+```
+
+
+## main function
+
+
+```{r}
+myparallelfunction <- function(x){
+  smooth.alpha <- function(x){
+    
+  }
+  
+  
+  
+  
+  
+}
+```
+
+
+
+
