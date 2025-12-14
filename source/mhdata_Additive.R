@@ -45,7 +45,7 @@ mhrate <- function(Z,model=1,violate.cox=TRUE){
   
     
     if (model==1)  surv.function <- function(t){ pexp(t,rate=top,lower.tail = FALSE)}
-    if (model==2)  surv.function<-function(t){ pmakeham(t,scale=1, shape=1,epsilon=top,lower.tail =                                                  FALSE)}
+    if (model==2)  surv.function<-function(t){ pmakeham(t,scale=1, shape=1,epsilon=top,lower.tail = FALSE)}
     
     #### true rate parameter for the hazard function
     # true_par<-0

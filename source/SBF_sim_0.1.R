@@ -278,3 +278,5 @@ k=2
 plot(result$x.grid[[k+1]],result$phi[[k]](result$x.grid[[k+1]]),lty=3,col=1,lwd=2) 
 lines(result$x.grid[[k+1]], log(result$SBF[[k+1]]),col='red',lwd=2)
 
+
+
