@@ -33,7 +33,12 @@ it=30
 b.grid<-numeric(set$d)
 b.grid[1]<-0.01
 b.grid[2:set$d]<-rep(0.3,set$d-1)
-alpha_backfit2<-SBF.MH.CLL(frmla,train.data,b.grid,weight='sw',it=it, x.grid=NULL,integral.approx='midd',kcorr=TRUE,LC=FALSE,wrong=FALSE,classic.backfit=FALSE)
+alpha_backfit2<-SBF.MH.CLL(frmla,train.data,
+                           b.grid,weight='sw',
+                           it=it, x.grid=NULL,
+                           integral.approx='midd',
+                           kcorr=TRUE,LC=FALSE,
+                           wrong=FALSE,classic.backfit=FALSE)
 
 
 plot(alpha_backfit2$x.grid[[2]],10/(set$d-1)*sin(pi*(alpha_backfit2$x.grid[[2]])))
