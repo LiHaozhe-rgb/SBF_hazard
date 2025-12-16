@@ -38,7 +38,158 @@ time <- as.vector(response[,"time"])
 status <- as.vector(response[,"status"])
 X <- cbind( time,X)
 
-# }}}
+
+## Grid construction
+
+d <- ncol(X) 
+n <- nrow(X)
+
+if(is.null(x.grid)) x.grid<-lapply(1:d,function(k) X[order(X[,k]),k])
+if(is.null(x.min)) x.min<-sapply(x.grid,head,1)
+if(is.null(x.max)) x.max<-sapply(x.grid,tail,1)
+
+
+
+x.grid.additional <- lapply(1:d, function(k) seq(x.min[k],x.max[k], length=n.grid.additional))
+x.grid <- lapply(1:d, function(k) sort(c(x.grid[[k]], x.grid.additional[[k]])))
+n.grid <- sapply(x.grid, length)
+
+if (integral.approx=='midd'){
+  dx<-lapply(1:d,function(k){  ddx<-diff(x.grid[[k]])
+  c(  (ddx[1]/2)+(x.grid[[k]][1]-x.min[k])  ,(ddx[-(n.grid[k]-1)]+ddx[-1])/2,  
+      (ddx[n.grid[k]-1]/2)+(x.max[k]-x.grid[[k]][n.grid[k]])  
+  )
+  }
+  )
+}
+
+if (integral.approx=='left'){
+  dx<-lapply(1:d,function(k){  ddx<-diff(x.grid[[k]])
+  c(  ddx,  x.max[k]-x.grid[[k]][n.grid[k]])  
+  }
+  )
+}
+
+if (integral.approx=='right'){
+  dx<-lapply(1:d,function(k){  ddx<-diff(x.grid[[k]])
+  c(  (x.grid[[k]][1]-x.min[k])  ,ddx)
+  }
+  )
+}
+
+
+
+## Kernel weighting and exposure process
+
+K.b<-array(0,dim=c(n.grid[1],n.grid[1]))
+k.b<-array(0,dim=c(n.grid[1]))
+
+
+
+x.grid.array<-matrix(rep(x.grid[[1]], times=n.grid[1]),nrow = n.grid[1], ncol = n.grid[1],byrow=FALSE)   # 
+
+
+u<- x.grid.array-t(x.grid.array) # u[t,s]= t-s for all t,s on the grid considered
+K.b<-apply(u/bandwidth[1],1:2,kern)/(bandwidth[1])
+k.b<-colSums(dx[[1]]*K.b)                      # small k for normailzing kernel, sincs grid points are symmetric normalization can be used for both row and column
+if (kcorr==FALSE) {k.b<-rep(1,n.grid[1])}                     
+
+
+dX0.b<- u#/bandwidth[1]     # dX0.b[t,s]= t-s for all t,s on the grid considered
+K.b <- K.b %*% diag(1/k.b)  ### row-wise division --> colSums(dx[[1]]*K.b)=1
+K.b[is.na(K.b)] <-0
+### define exposure=Y[i,s]
+
+Y<-t(sapply(1:n,function(i) { temp<-numeric(n.grid[1])
+for (l in 1:n.grid[1]) {temp[l]<-as.numeric((x.grid[[1]][l]<=time[i]))
+} 
+return(temp) 
+}
+))
+
+
+
+dX.b<-K.X.b<-k.X.b<-list()
+for( k in 1:d){
+  k.X.b[[k]]<-numeric(n)
+  
+  x.grid.array<-matrix(-X[,k],nrow =n.grid[k], ncol =n ,byrow=TRUE)   # 
+  u<- x.grid.array+x.grid[[k]]      ####  u[,i]=x_k - X_{ik}
+  K.X.b[[k]] <- apply(u/bandwidth[k],1:2,kern)/(bandwidth[k])
+  k.X.b[[k]]<-colSums(dx[[k]]*K.X.b[[k]])   
+  if (kcorr==FALSE) k.X.b[[k]] <- rep(1,n)
+  dX.b[[k]]<- u               #### dX.b[[k]] [,i] = x_k-X_{ik} 
+  # K.X.bC[[k]] <- K.X.b[[k]]/ k.X.b[[k]]
+  K.X.b[[k]]<- K.X.b[[k]] %*%  diag(1/k.X.b[[k]])  ### row-wise division ---> col integration=1
+  #(dx[[k]]*K.X.b[[k]]) =1
+  K.X.b[[k]][is.na(K.X.b[[k]])] <-0
+  
+}
+
+
+## Kernel-smoothed occurrences and other variables
+
+get.D<-function(k,dx,K.X.b,K.b,Y){
+  # V_{0,0}^j, the denominator or eq(31)
+  if (k==1)
+  {
+    D <-     colSums( Y    %*%  (t(K.b) *dx[[1]])  ) 
+    
+  }else 
+    D <-   K.X.b[[k]]  %*%  Y   %*%   as.matrix(dx[[1]]) 
+  
+  return(D)
+}
+
+get.O1<-function(k,status,K.X.b){
+  # U_0^j in the numerator of eq(31), the first term
+  O1 <- as.numeric(  K.X.b[[k]] %*% status )
+  
+  return(O1)
+}
+
+
+get.O3<-function(k,dx,K.X.b,K.b,Y){
+  # V_{j,0}^j in the numerator of eq(31), the second term
+  if (k==1)
+  {
+    O3 <- colSums( Y    %*%  (t(dX0.b*K.b) *dx[[1]])  )  
+    
+  }else O3 <- (( dX.b[[k]]*K.X.b[[k]] ) %*%  Y   %*%  as.matrix(dx[[1]]) ) 
+  
+  return(O3) 
+}
+
+get.D.1<-function(k,dx,K.X.b,K.b,dX.b,dX0.b,Y){
+  
+  if (k==1)
+  {
+    D <-     colSums( Y    %*%  (t(dX0.b^2*K.b) *dx[[1]])  ) 
+    
+  }else
+    D <-   (dX.b[[k]]^2*K.X.b[[k]])  %*%  Y   %*%  as.matrix(dx[[1]] )
+  return(D)
+}
+
+
+get.O1.1<-function(k,status,K.X.b,dX.b){
+  O1<- as.numeric((dX.b[[k]]*K.X.b[[k]]) %*% status)
+  return(O1)
+}
+
+
+get.O3.1<-function(k,dx,K.X.b,K.b,dX.b,dX0.b,Y){
+  
+  if (k==1)
+  {
+    O3 <- colSums( Y    %*%  (t(dX0.b*K.b)*dx[[1]])  )  
+  }else O3 <- ( dX.b[[k]]*K.X.b[[k]] ) %*%  Y    %*%  as.matrix(dx[[1]]) 
+  
+  return(O3)
+}
+
+
+
 
 
 
@@ -63,7 +214,6 @@ taylor.alpha<-function(alpha,alpha.1,dx,K.X.b,K.b,dX.b,dX0.b,x.grid,n.grid,d,n)
     
   }
   
-
   
   return(list( taylor.alpha.i= taylor.alpha.i,taylor.alpha.i.0=taylor.alpha.i.0))
 }
@@ -169,150 +319,6 @@ get.alpha.1.new<-function(O1.1,O3.1,D.1,alpha,alpha.1,dx,K.X.b,K.b,dX.b,dX0.b,Y,
   
     return(as.numeric(div(O.1,D.1[[k]])))
 } 
-
-get.D<-function(k,dx,K.X.b,K.b,Y){
-  # V_{0,0}^j, the denominator or eq(31)
-  if (k==1)
-  {
-    D <-     colSums( Y    %*%  (t(K.b) *dx[[1]])  ) 
-    
-  }else 
-    D <-   K.X.b[[k]]  %*%  Y   %*%   as.matrix(dx[[1]]) 
-  
-  return(D)
-}
-  
-get.O1<-function(k,status,K.X.b){
-  # U_0^j in the numerator of eq(31), the first term
-  O1 <- as.numeric(  K.X.b[[k]] %*% status )
-  
-  return(O1)
-}
-
-
-get.O3<-function(k,dx,K.X.b,K.b,Y){
-  # V_{j,0}^j in the numerator of eq(31), the second term
-  if (k==1)
-  {
-    O3 <- colSums( Y    %*%  (t(dX0.b*K.b) *dx[[1]])  )  
-    
-  }else O3 <- (( dX.b[[k]]*K.X.b[[k]] ) %*%  Y   %*%  as.matrix(dx[[1]]) ) 
-  
-  return(O3) 
-}
-
-get.D.1<-function(k,dx,K.X.b,K.b,dX.b,dX0.b,Y){
-  
-  if (k==1)
-  {
-    D <-     colSums( Y    %*%  (t(dX0.b^2*K.b) *dx[[1]])  ) 
-    
-  }else
-    D <-   (dX.b[[k]]^2*K.X.b[[k]])  %*%  Y   %*%  as.matrix(dx[[1]] )
-  return(D)
-}
-    
-
-get.O1.1<-function(k,status,K.X.b,dX.b){
-  O1<- as.numeric((dX.b[[k]]*K.X.b[[k]]) %*% status)
-  return(O1)
-}
-  
-  
-get.O3.1<-function(k,dx,K.X.b,K.b,dX.b,dX0.b,Y){
-  
-  if (k==1)
-  {
-    O3 <- colSums( Y    %*%  (t(dX0.b*K.b)*dx[[1]])  )  
-  }else O3 <- ( dX.b[[k]]*K.X.b[[k]] ) %*%  Y    %*%  as.matrix(dx[[1]]) 
-  
-  return(O3)
-}
-    
-    
-d <- ncol(X) 
-n <- nrow(X)
-
-if(is.null(x.grid)) x.grid<-lapply(1:d,function(k) X[order(X[,k]),k])
-if(is.null(x.min)) x.min<-sapply(x.grid,head,1)
-if(is.null(x.max)) x.max<-sapply(x.grid,tail,1)
-
-
-
-x.grid.additional <- lapply(1:d, function(k) seq(x.min[k],x.max[k], length=n.grid.additional))
-x.grid <- lapply(1:d, function(k) sort(c(x.grid[[k]], x.grid.additional[[k]])))
-n.grid <- sapply(x.grid, length)
-
-if (integral.approx=='midd'){
-  dx<-lapply(1:d,function(k){  ddx<-diff(x.grid[[k]])
-  c(  (ddx[1]/2)+(x.grid[[k]][1]-x.min[k])  ,(ddx[-(n.grid[k]-1)]+ddx[-1])/2,  
-      (ddx[n.grid[k]-1]/2)+(x.max[k]-x.grid[[k]][n.grid[k]])  
-  )
-  }
-  )
-}
-
-if (integral.approx=='left'){
-  dx<-lapply(1:d,function(k){  ddx<-diff(x.grid[[k]])
-  c(  ddx,  x.max[k]-x.grid[[k]][n.grid[k]])  
-  }
-  )
-}
-
-if (integral.approx=='right'){
-  dx<-lapply(1:d,function(k){  ddx<-diff(x.grid[[k]])
-  c(  (x.grid[[k]][1]-x.min[k])  ,ddx)
-  }
-  )
-}
-
-
-
-
-K.b<-array(0,dim=c(n.grid[1],n.grid[1]))
-k.b<-array(0,dim=c(n.grid[1]))
-
-
-
-x.grid.array<-matrix(rep(x.grid[[1]], times=n.grid[1]),nrow = n.grid[1], ncol = n.grid[1],byrow=FALSE)   # 
-
-
-u<- x.grid.array-t(x.grid.array) # u[t,s]= t-s for all t,s on the grid considered
-K.b<-apply(u/bandwidth[1],1:2,kern)/(bandwidth[1])
-k.b<-colSums(dx[[1]]*K.b)                      # small k for normailzing kernel, sincs grid points are symmetric normalization can be used for both row and column
-if (kcorr==FALSE) {k.b<-rep(1,n.grid[1])}                     
-
-
-dX0.b<- u#/bandwidth[1]     # dX0.b[t,s]= t-s for all t,s on the grid considered
-K.b <- K.b %*% diag(1/k.b)  ### row-wise division --> colSums(dx[[1]]*K.b)=1
-K.b[is.na(K.b)] <-0
-### define exposure=Y[i,s]
-
-Y<-t(sapply(1:n,function(i) { temp<-numeric(n.grid[1])
-for (l in 1:n.grid[1]) {temp[l]<-as.numeric((x.grid[[1]][l]<=time[i]))
-} 
-return(temp) 
-}
-))
-
-
-
-dX.b<-K.X.b<-k.X.b<-list()
-for( k in 1:d){
-  k.X.b[[k]]<-numeric(n)
-  
-  x.grid.array<-matrix(-X[,k],nrow =n.grid[k], ncol =n ,byrow=TRUE)   # 
-  u<- x.grid.array+x.grid[[k]]      ####  u[,i]=x_k - X_{ik}
-  K.X.b[[k]] <- apply(u/bandwidth[k],1:2,kern)/(bandwidth[k])
-  k.X.b[[k]]<-colSums(dx[[k]]*K.X.b[[k]])   
-  if (kcorr==FALSE) k.X.b[[k]] <- rep(1,n)
-  dX.b[[k]]<- u               #### dX.b[[k]] [,i] = x_k-X_{ik} 
- # K.X.bC[[k]] <- K.X.b[[k]]/ k.X.b[[k]]
-  K.X.b[[k]]<- K.X.b[[k]] %*%  diag(1/k.X.b[[k]])  ### row-wise division ---> col integration=1
-  #(dx[[k]]*K.X.b[[k]]) =1
-  K.X.b[[k]][is.na(K.X.b[[k]])] <-0
-  
-}
 
 
 D<-O1<-O3<-D1.1<-O1.1<-O3.1<-list()
